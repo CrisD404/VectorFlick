@@ -21,7 +21,8 @@ const LANG_COLORS = ['#4f8ff7', '#ffa726', '#e8234a', '#1de9b6', '#ffe04a', '#a6
 const YEAR_STOPS = [[1895, '#6b46c9'], [1930, '#a54fd0'], [1955, '#d94fa6'], [1975, '#ff6f61'], [1995, '#ffa53d'], [2012, '#ffd84d'], [2027, '#fff8b0']];
 const RATING_STOPS = [[10, '#c22f45'], [40, '#ef5350'], [58, '#ff9d2e'], [68, '#ffd84d'], [78, '#6fdc8c'], [88, '#2ee6c8'], [100, '#c8fbff']];
 const UNKNOWN = '#59606e';
-const F_POSTER = 1, F_ADULT = 2, F_OVERVIEW = 4, F_IMDB_ONLY = 8, F_SAVED = 16;   // F_SAVED se enciende en el navegador
+const F_POSTER = 1, F_ADULT = 2, F_OVERVIEW = 4, F_IMDB_ONLY = 8;
+const F_SAVED = 16, F_HILITE = 32;       // estos dos se encienden en el navegador: guardadas y filmografía resaltada
 // JustWatch: la ruta de búsqueda cambia según el idioma de cada país
 const JW = Object.fromEntries([
   ...['ar', 'mx', 'es', 'co', 'cl', 'pe', 'uy', 've', 'ec', 'bo', 'py', 'cr', 'gt'].map((c) => [c.toUpperCase(), c + '/buscar']),
@@ -44,7 +45,7 @@ let maxPoint = 256;
 const GRID = 256;
 let gx0 = 0, gy0 = 0, gcw = 1, gch = 1;
 
-const filt = { gmask: 0, gall: false, y0: 0, y1: 255, rating: 0, lang: -1, onlyPoster: false, hideAdult: false, onlySaved: false };
+const filt = { gmask: 0, gall: false, y0: 0, y1: 255, rating: 0, lang: -1, onlyPoster: false, hideAdult: false, onlySaved: false, person: false };
 let colorMode = 0, showLabels = true;
 let hover = -1, selected = -1, selSimilar = [], selDetails = null;
 let saved = [];                  // guardadas: [{c: id estable, i: nodo (-1 si aún no se ubicó), t, y, g, p, at}]
@@ -94,6 +95,7 @@ function passes(i) {
   if (filt.hideAdult && (fl & F_ADULT)) return false;
   if (filt.onlyPoster && !(fl & F_POSTER)) return false;
   if (filt.onlySaved && !(fl & F_SAVED)) return false;
+  if (filt.person && !(fl & F_HILITE)) return false;
   if (filt.gmask) { const m = GM[i] & filt.gmask; if (filt.gall ? m !== filt.gmask : m === 0) return false; }
   const y = AT[a + 2];
   if (y < filt.y0 || y > filt.y1) return false;
@@ -209,6 +211,7 @@ function addChunk(k, buf) {
   const off = k * M.chunkSize, n = M.chunks[k];
   const xy = new Float32Array(buf, 0, 2 * n), gm = new Uint32Array(buf, 8 * n, n), at = new Uint8Array(buf, 12 * n, 8 * n);
   for (const it of saved) if (it.i >= off && it.i < off + n) at[(it.i - off) * 8 + 5] |= F_SAVED;
+  if (person) for (const i of person.idx) if (i >= off && i < off + n) at[(i - off) * 8 + 5] |= F_HILITE;
   XY.set(xy, off * 2); GM.set(gm, off); AT.set(at, off * 8);
   // Orden en la GPU. Trozos importantes: invertido, así las más votadas se dibujan arriba.
   // El resto: permutación (j·A mod n) que reparte parejo el orden original, de modo que dibujar
@@ -288,7 +291,9 @@ function resize() {
 }
 let isFit = true;
 // encuadre del mapa completo dentro del área libre (sin los paneles laterales)
-const insets = () => [W > 760 && !($('#filters').hidden && $('#saved').hidden) ? 372 : 0, W > 760 && !panel.hidden ? 400 : 0];
+const LEFT = ['filters', 'saved', 'people'];          // paneles de la izquierda: se muestra uno a la vez
+const leftOpen = () => LEFT.some((id) => !$('#' + id).hidden);
+const insets = () => [W > 760 && leftOpen() ? 372 : 0, W > 760 && !panel.hidden ? 400 : 0];
 function fitParams() {
   const [x0, y0, x1, y1] = M.bounds;
   const [l, r] = insets();
@@ -316,7 +321,7 @@ function drawGL() {
   gl.uniform1i(U.mode, colorMode); gl.uniform1i(U.gall, filt.gall ? 1 : 0);
   gl.uniform1ui(U.gmask, filt.gmask >>> 0);
   gl.uniform1ui(U.hide, filt.hideAdult ? F_ADULT : 0);
-  gl.uniform1ui(U.req, (filt.onlyPoster ? F_POSTER : 0) | (filt.onlySaved ? F_SAVED : 0));
+  gl.uniform1ui(U.req, (filt.onlyPoster ? F_POSTER : 0) | (filt.onlySaved ? F_SAVED : 0) | (filt.person ? F_HILITE : 0));
   gl.uniform2f(U.year, filt.y0, filt.y1); gl.uniform1f(U.rating, filt.rating); gl.uniform1f(U.lang, filt.lang);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, palTex); gl.uniform1i(U.pal, 0);
   // LOD: con el mapa lejos hay varios nodos por píxel; se dibuja la fracción que mantiene ~2 por
@@ -507,7 +512,7 @@ function drawOverlay() {
   if (selected >= 0 && selected < loaded) {
     const x0 = sx(XY[2 * selected]), y0 = sy(XY[2 * selected + 1]);
     ctx.lineWidth = 1.2;
-    for (const j of selSimilar) {
+    for (const j of person ? [] : selSimilar) {       // con una filmografía resaltada, las similares solo confunden
       if (j >= loaded) continue;
       const x1 = sx(XY[2 * j]), y1 = sy(XY[2 * j + 1]);
       const g = ctx.createLinearGradient(x0, y0, x1, y1);
@@ -539,6 +544,21 @@ function drawOverlay() {
       ctx.strokeStyle = '#ffb224'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, 6.2832); ctx.stroke();
       drawStar(x + r * 0.74, y - r * 0.74, clamp(r * 0.3, 6, 12));
     } else drawStar(x, y, Math.max(6.5, r + 3.5));
+  }
+  // --- filmografía resaltada: de lejos cada película es un punto con borde blanco; de cerca, un anillo
+  const personVisible = [];
+  if (person) {
+    ctx.lineWidth = 1.8; ctx.strokeStyle = '#fff';
+    for (const i of person.idx) {
+      if (i >= loaded || !passes(i)) continue;
+      const x = sx(XY[2 * i]), y = sy(XY[2 * i + 1]);
+      if (x < -30 || x > W + 30 || y < -30 || y > H + 30) continue;
+      const r = radiusPx(i);
+      ctx.beginPath();
+      if (r < 6.5) { ctx.arc(x, y, 5, 0, 6.2832); ctx.fillStyle = colorOf(i); ctx.fill(); } else ctx.arc(x, y, r + 2.5, 0, 6.2832);
+      ctx.stroke();
+      if (personVisible.push(i) >= 3000) break;
+    }
   }
   if (!showLabels) return;
 
@@ -595,6 +615,10 @@ function drawOverlay() {
     ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fillText(t, x, ly);
     placed++;
   };
+  for (const i of personVisible.slice(0, 45)) {
+    const t = person.titles.get(i) || titleOf(i), y = yearOf(i);
+    if (t) tryLabel(i, (t.length > 27 ? t.slice(0, 26) + '…' : t) + (y ? ' · ' + y : ''));
+  }
   for (const it of savedVisible.slice(0, 40)) tryLabel(it.i, it.t);
   if (vis) for (const i of vis) tryLabel(i);
   else {
@@ -840,7 +864,9 @@ function renderPanel(i, d) {
       <div class="title-row"><h1>${esc(d.t)}</h1>${codeOf(d) ? `<button class="save-btn" data-act="save" title="Guardar o quitar de guardadas (S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg><span></span></button>` : ''}</div>
       ${d.o ? `<div class="orig">${esc(d.o)}</div>` : ''}
       <div class="meta">${esc(meta)}</div>
-      ${d.dir ? `<div class="meta">Dirigida por <b>${esc(d.dir)}</b></div>` : ''}
+      ${d.dir ? `<div class="meta">Dirigida por ${M.dirBuckets
+        ? d.dir.split(', ').map((n) => `<button class="person" data-person="${esc(n)}" title="Resaltar en el mapa las películas de ${esc(n)}">${esc(n)}</button>`).join(', ')
+        : `<b>${esc(d.dir)}</b>`}</div>` : ''}
       ${rate.length ? `<div class="rating">${rate.join('')}</div>` : ''}
     </div>
     </div>
@@ -872,6 +898,8 @@ panelBody.addEventListener('click', (e) => {
   const li = e.target.closest('.similar li'); if (li) return select(+li.dataset.i);
   const tag = e.target.closest('.tag[data-genre]'); if (tag) return toggleGenre(+tag.dataset.genre, true);
   if (e.target.closest('[data-act=save]')) return toggleSave();
+  const who = e.target.closest('[data-person]');
+  if (who) return showPerson(who.dataset.person);
   if (e.target.closest('[data-act=zoom-poster]') && selDetails?.p) return openLightbox(selDetails.p, selDetails.t);
   if (e.target.closest('[data-act=watch-cfg]')) { watchCfg.open = !watchCfg.open; return renderWatch(selDetails); }
   if (e.target.closest('[data-act=locate]') && selected >= 0) focusNode(selected);
@@ -1038,14 +1066,86 @@ function updateSavedUI() {
 function setOnlySaved(on) {
   filt.onlySaved = on; $('#only-saved').checked = $('#saved-only').checked = on;
   filtersChanged();
-  const pts = saved.filter((it) => it.i >= 0 && it.i < loaded);
-  if (!on || !pts.length) return;
-  if (pts.length === 1) return focusNode(pts[0].i);
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;     // encuadra todas las guardadas
-  for (const { i } of pts) { x0 = Math.min(x0, XY[2 * i]); x1 = Math.max(x1, XY[2 * i]); y0 = Math.min(y0, XY[2 * i + 1]); y1 = Math.max(y1, XY[2 * i + 1]); }
-  const [l, r] = insets(), s = Math.min((W - l - r) / (x1 - x0 + 40), H / (y1 - y0 + 40)) * 0.8;
-  flyTo((x0 + x1) / 2 - (l - r) / 2 / Math.min(s, 14), (y0 + y1) / 2, Math.min(s, 14), 900);
+  if (on) fitToNodes(saved.map((it) => it.i));
 }
+// Encuadra un conjunto de nodos dentro del área libre (sin los paneles ni la hoja del celular).
+function fitToNodes(list, dur = 900) {
+  const pts = list.filter((i) => i >= 0 && i < loaded);
+  if (!pts.length) return;
+  if (pts.length === 1) return focusNode(pts[0], dur);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of pts) { x0 = Math.min(x0, XY[2 * i]); x1 = Math.max(x1, XY[2 * i]); y0 = Math.min(y0, XY[2 * i + 1]); y1 = Math.max(y1, XY[2 * i + 1]); }
+  const [l, r] = insets(), top = isMobile() ? 112 : 24, bottom = isMobile() && !panel.hidden ? H * 0.52 + 12 : 24;
+  const aw = Math.max(W - l - r, 120), ah = Math.max(H - top - bottom, 120);
+  const s = clamp(Math.min(aw / (x1 - x0 + 30), ah / (y1 - y0 + 30)) * 0.84, sMin, 14);
+  // el centro del conjunto queda en el centro del área libre
+  flyTo((x0 + x1) / 2 - (l + aw / 2 - W / 2) / s, (y0 + y1) / 2 - (top + ah / 2 - H / 2) / s, s, dur);
+}
+
+// ------------------------------------------------------------------ filmografía de un director
+// Tocar el nombre en la ficha resalta en el mapa todas sus películas (el resto se atenúa) y las lista.
+// El índice nombre -> nodos está repartido en archivos por hash del nombre (ver 04_export.py).
+let person = null;          // { name, idx: nodos por importancia, titles: Map nodo -> título ya conocido }
+function fnv1a(s) {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(s)) h = Math.imul(h ^ b, 0x01000193);
+  return h >>> 0;
+}
+let personSeq = 0;
+async function showPerson(name) {
+  if (person?.name === name) return clearPerson();                 // segundo toque: quita el resaltado
+  const seq = ++personSeq, from = selected;
+  let idx = [];
+  try { idx = ((await fetchJSON(`dirs/${fnv1a(name) % M.dirBuckets}.json`))[name] || []).filter((i) => i < N); } catch { /* sin red: queda solo la película abierta */ }
+  if (seq !== personSeq) return;
+  if (!idx.length && from >= 0) idx = [from];                      // una sola película: no está en el índice
+  clearPerson(true);
+  person = { name, idx, titles: new Map() };
+  for (const i of idx) setFlag(i, F_HILITE, true);
+  filt.person = true;
+  if (isMobile() && panel.classList.contains('full')) setSheet(false);   // que se vea el mapa
+  renderPerson(); filtersChanged();
+  if (!isMobile()) showLeft('people', true);
+  fitToNodes(idx);
+}
+function clearPerson(keepUI = false) {
+  if (!person) return;
+  for (const i of person.idx) setFlag(i, F_HILITE, false);
+  person = null; filt.person = false; personSeq++;
+  if (keepUI) return;
+  renderPerson(); filtersChanged();
+}
+const PEOPLE_LIST_MAX = 80;
+function renderPerson() {
+  $('#person-pill').hidden = !person;
+  if (!person) { if (!$('#people').hidden) showLeft('people', false); return; }
+  const n = person.idx.length;
+  $('#person-name').textContent = person.name; $('#person-count').textContent = nf.format(n);
+  $('#people-name').textContent = person.name;
+  // se listan las más conocidas, en orden cronológico
+  const shown = person.idx.slice(0, PEOPLE_LIST_MAX).sort((a, b) => (yearOf(a) || 9999) - (yearOf(b) || 9999) || a - b);
+  $('#people-list').innerHTML = shown.map((i) => `<li data-i="${i}" tabindex="0" style="--c:${i < loaded ? colorOf(i) : '#444'}"><div class="th"></div><div class="t"><div class="skeleton" style="width:${45 + (i % 45)}%"></div></div><div class="y">${i < loaded && yearOf(i) ? yearOf(i) : ''}</div></li>`).join('');
+  const note = $('#people-note');
+  note.hidden = n <= PEOPLE_LIST_MAX;
+  note.textContent = `Se listan las ${PEOPLE_LIST_MAX} más conocidas de ${nf.format(n)}; todas están resaltadas en el mapa.`;
+  const who = person;
+  for (const li of $('#people-list').children) {
+    const i = +li.dataset.i;
+    titleAsync(i).then((t) => {
+      if (person !== who) return;
+      who.titles.set(i, t); li.querySelector('.t').textContent = t; li.title = t;
+      const p = posterOf(i); if (p) li.querySelector('.th').style.backgroundImage = `url(${IMG}w92${p})`;
+      render();
+    });
+  }
+}
+$('#people-list').addEventListener('click', (e) => { const li = e.target.closest('li[data-i]'); if (li && +li.dataset.i < loaded) select(+li.dataset.i); });
+$('#people-list').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('li[data-i]')) e.target.click(); });
+$('#people-list').addEventListener('mouseover', (e) => { const li = e.target.closest('li[data-i]'); if (li && +li.dataset.i < loaded) { hover = +li.dataset.i; render(); } });
+$('#people-list').addEventListener('mouseout', () => { if (hover >= 0) { hover = -1; render(); } });
+$('#person-open').onclick = () => showLeft('people');
+$('#person-clear').onclick = () => clearPerson();
+$('#people-fit').onclick = () => person && fitToNodes(person.idx);
 $('#saved-list').addEventListener('click', (e) => {
   const rm = e.target.closest('[data-rm]');
   if (rm) return removeSaved(saved[+rm.dataset.rm]);
@@ -1167,6 +1267,7 @@ function buildFilters() {
   $('#hide-adult').onchange = (e) => { filt.hideAdult = e.target.checked; filtersChanged(); };
   $('#genre-mode').onclick = (e) => { filt.gall = !filt.gall; e.target.textContent = filt.gall ? 'todos' : 'cualquiera'; filtersChanged(); };
   $('#reset').onclick = () => {
+    clearPerson();
     filt.gmask = 0; filt.rating = 0; filt.lang = -1; filt.onlyPoster = filt.hideAdult = filt.onlySaved = false;
     $('#rating-min').value = 0; $('#rating-out').textContent = 'cualquiera'; sel.value = -1;
     $('#only-poster').checked = $('#hide-adult').checked = $('#only-saved').checked = $('#saved-only').checked = false;
@@ -1206,7 +1307,7 @@ function filtersChanged() {
   if (hover >= 0 && !passes(hover)) setHover(-1);
 }
 function updateCount() {
-  const active = (filt.gmask ? 1 : 0) + (filt.y0 > 0 || filt.y1 < 255 ? 1 : 0) + (filt.rating ? 1 : 0) + (filt.lang >= 0 ? 1 : 0) + (filt.onlyPoster ? 1 : 0) + (filt.hideAdult ? 1 : 0) + (filt.onlySaved ? 1 : 0);
+  const active = (filt.gmask ? 1 : 0) + (filt.y0 > 0 || filt.y1 < 255 ? 1 : 0) + (filt.rating ? 1 : 0) + (filt.lang >= 0 ? 1 : 0) + (filt.onlyPoster ? 1 : 0) + (filt.hideAdult ? 1 : 0) + (filt.onlySaved ? 1 : 0) + (filt.person ? 1 : 0);
   let c = loaded;
   if (active) { c = 0; for (let i = 0; i < loaded; i++) if (passes(i)) c++; }
   const partial = loaded < N ? ` <span style="color:var(--faint)">(cargando ${Math.round(loaded / N * 100)}%)</span>` : '';
@@ -1214,19 +1315,19 @@ function updateCount() {
   $('#reset').hidden = !active;
   const badge = $('#filter-badge'); badge.hidden = !active; badge.textContent = active;
 }
-// panel izquierdo: filtros o guardadas (uno a la vez)
+// panel izquierdo: filtros, guardadas o filmografía (uno a la vez)
 function showLeft(which, force) {
-  const el = $('#' + which), other = $(which === 'filters' ? '#saved' : '#filters');
-  el.hidden = force !== undefined ? !force : !el.hidden;
-  if (!el.hidden) other.hidden = true;
-  if (!el.hidden && isMobile() && panel.classList.contains('full')) setSheet(false);   // el menú necesita lugar
+  const show = force !== undefined ? force : $('#' + which).hidden;
+  for (const id of LEFT) $('#' + id).hidden = id !== which || !show;
+  if (show && isMobile() && panel.classList.contains('full')) setSheet(false);   // el menú necesita lugar
   syncLeft();
 }
-function hideLeft() { $('#filters').hidden = $('#saved').hidden = true; syncLeft(); }
+function hideLeft() { for (const id of LEFT) $('#' + id).hidden = true; syncLeft(); }
 function syncLeft() {
   $('#btn-filters').setAttribute('aria-expanded', !$('#filters').hidden);
   $('#btn-saved').setAttribute('aria-expanded', !$('#saved').hidden);
-  document.body.classList.toggle('filters-open', !($('#filters').hidden && $('#saved').hidden));
+  $('#person-open').setAttribute('aria-expanded', !$('#people').hidden);
+  document.body.classList.toggle('filters-open', leftOpen());
   if (isFit && M && cam.s > 0) fitView(350);
 }
 const toggleFilters = (force) => showLeft('filters', force);

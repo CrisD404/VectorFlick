@@ -35,6 +35,17 @@
   </div>
   <ul id="results" class="glass" role="listbox" hidden></ul>
 
+  <div id="person-pill" class="glass" hidden>
+    <button id="person-open" title="Ver la lista de películas" aria-expanded="false" aria-controls="people">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16v10H4zM4 9l1.2-3.6 14.6-2.2.9 3.4L4 9zM9 5.2l1.6 2.6M14 4.4l1.6 2.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <span>Películas de <b id="person-name"></b></span>
+      <i id="person-count"></i>
+    </button>
+    <button id="person-clear" class="icon-btn" title="Quitar el resaltado" aria-label="Quitar el resaltado">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
   <section id="filters" class="glass" aria-label="Filtros">
     <div class="row seg-row">
       <span class="lbl">Color</span>
@@ -99,6 +110,15 @@
       <button id="saved-export" class="link-btn">Exportar lista</button>
       <label class="link-btn" tabindex="0">Importar<input type="file" id="saved-import" accept="application/json,.json" hidden></label>
     </div>
+  </section>
+
+  <section id="people" class="glass" aria-label="Filmografía resaltada" hidden>
+    <div class="group-head">
+      <span class="lbl">Dirigidas por <b id="people-name"></b></span>
+      <button id="people-fit" class="link-btn">Encuadrar todas</button>
+    </div>
+    <ul id="people-list" class="similar"></ul>
+    <p id="people-note" class="hint" hidden></p>
   </section>
 </div>
 

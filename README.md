@@ -12,11 +12,14 @@ Funciona en computadora y en celular. No tiene cuentas, publicidad ni analítica
 
 - **Explorar** el mapa con zoom y arrastre. Los nombres de las regiones aparecen en tres niveles a medida
   que te acercás (género → subgénero → tema).
-- **Buscar** cualquier título del catálogo, por su título internacional o por el original
-  (*The Secret in Their Eyes* o *El secreto de sus ojos*).
+- **Buscar** cualquier título del catálogo, por su título internacional, el original o el que tuvo en
+  español (*The Godfather* o *El padrino*; *The Secret in Their Eyes* o *El secreto de sus ojos*).
 - **Filtrar** por género, año, nota mínima e idioma, y **colorear** el mapa por género, año, nota o idioma.
 - **Abrir una ficha**: póster, año, idioma, duración, dirección, nota, géneros, sinopsis, reparto,
   enlaces a TMDB/IMDb y 12 películas similares (también dibujadas como líneas sobre el mapa).
+- **Ver la filmografía de un director**: tocá su nombre en la ficha y todas sus películas quedan resaltadas
+  en el mapa (el resto se atenúa), con la lista en orden cronológico. Sirve para ver por qué zonas del mapa
+  se movió a lo largo de su carrera.
 - **Guardar películas** con ★: quedan en una lista aparte, marcadas con una estrella dorada en el mapa, y se
   pueden aislar con un filtro. La lista vive en tu navegador y se puede exportar/importar.
 - **Dónde ver**: cada ficha enlaza a las plataformas disponibles en tu país (página de TMDB y búsqueda en
@@ -33,6 +36,7 @@ Funciona en computadora y en celular. No tiene cuentas, publicidad ni analítica
 | Filtros y colores | `F` | botón de filtros |
 | Guardar la película abierta | `S` o botón **★ Guardar** | botón **★ Guardar** |
 | Ver las guardadas | `G` o ★ de la barra | ★ de la barra |
+| Resaltar las películas de un director | click en su nombre, en la ficha | toque en su nombre, en la ficha |
 | Ampliar el póster | click en el póster | toque en el póster |
 | Expandir / cerrar la ficha | `Esc` cierra | arrastrar la hoja hacia arriba o abajo |
 | Ver todo el mapa | `0` | botón de encuadre |
@@ -83,6 +87,7 @@ data/
   ids/              identificador estable de cada punto (para las guardadas)
   tiles/            título y póster por zona del mapa
   details/          ficha completa por zona del mapa
+  dirs/             películas de cada director (para resaltar una filmografía)
 ```
 
 ### Probarlo en tu máquina
@@ -105,7 +110,7 @@ Los datos son una foto del 9 de noviembre de 2026.
   [TMDB Movies Daily Updates](https://www.kaggle.com/datasets/alanvourch/tmdb-movies-daily-updates).
   Los pósters se cargan directamente desde los servidores de TMDB.
   *This product uses the TMDB API but is not endorsed or certified by TMDB.*
-- **[IMDb](https://www.imdb.com/)** — notas, votos y los títulos que no están en TMDB, de los
+- **[IMDb](https://www.imdb.com/)** — notas, votos, títulos en español y las películas que no están en TMDB, de los
   [IMDb Non-Commercial Datasets](https://developer.imdb.com/non-commercial-datasets/).
   *Information courtesy of IMDb (https://www.imdb.com). Used with permission.*
 - **[JustWatch](https://www.justwatch.com/)** — la disponibilidad en plataformas, a través de TMDB.

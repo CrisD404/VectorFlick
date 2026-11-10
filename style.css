@@ -65,11 +65,27 @@ kbd { font: 11px/1 var(--font); color: var(--faint); border: 1px solid var(--lin
 .badge[hidden] { display: none; }
 .icon-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .1); color: var(--text); }
 
-/* ---------- guardadas ---------- */
-#saved { padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-height: 0; }
-#saved[hidden] { display: none; }
+/* ---------- guardadas y filmografía (listas del panel izquierdo) ---------- */
+#saved, #people { padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-height: 0; }
+#saved[hidden], #people[hidden] { display: none; }
 #saved .lbl b { color: var(--accent); margin-left: 4px; letter-spacing: 0; }
-#saved-list { overflow-y: auto; margin: 0 -6px; min-height: 0; scrollbar-width: thin; scrollbar-color: #333a4a transparent; }
+#people .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#people .lbl b { color: var(--text); margin-left: 4px; letter-spacing: 0; text-transform: none; font-size: 13px; }
+#people .group-head { gap: 10px; }
+#people .link-btn { flex: none; }
+#saved-list, #people-list { overflow-y: auto; margin: 0 -6px; min-height: 0; scrollbar-width: thin; scrollbar-color: #333a4a transparent; }
+
+/* director clickeable en la ficha y aviso de filmografía resaltada */
+.person { color: var(--text); font-weight: 500; text-decoration: underline; text-decoration-color: rgba(255, 255, 255, .28); text-underline-offset: 3px; border-radius: 4px; text-align: left; }
+.person:hover { color: var(--accent); text-decoration-color: currentColor; }
+#person-pill { display: flex; align-items: center; gap: 2px; padding: 3px 4px 3px 4px; border-color: rgba(255, 178, 36, .45); }
+#person-pill[hidden] { display: none; }
+#person-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 9px; font-size: 13px; color: var(--muted); text-align: left; }
+#person-open:hover { background: rgba(255, 255, 255, .07); }
+#person-open svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+#person-open span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#person-open b { color: var(--text); font-weight: 600; }
+#person-count { flex: none; margin-left: auto; font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
 #saved-list li { grid-template-columns: 34px 1fr auto 24px; }
 #saved-list li.missing { opacity: .5; cursor: default; }
 #saved-list .rm { width: 24px; height: 24px; border-radius: 6px; color: var(--faint); font-size: 16px; line-height: 1; }
@@ -117,7 +133,7 @@ kbd { font: 11px/1 var(--font); color: var(--faint); border: 1px solid var(--lin
 #results .y { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; }
 #results .empty, #results .more { grid-template-columns: 1fr; color: var(--faint); cursor: default; font-size: 12.5px; }
 #results .empty:hover, #results .more:hover { background: none; }
-#results:not([hidden]) ~ #filters, #results:not([hidden]) ~ #saved { display: none; }   /* los resultados ocupan el lugar de los paneles */
+#results:not([hidden]) ~ #filters, #results:not([hidden]) ~ #saved, #results:not([hidden]) ~ #people, #results:not([hidden]) ~ #person-pill { display: none; }   /* los resultados ocupan el lugar de los paneles */
 
 /* ---------- filters ---------- */
 #filters { padding: 14px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333a4a transparent; transition: opacity .18s, transform .18s; }
@@ -269,8 +285,8 @@ body.filters-open #perf { left: 376px; }
   input, select { font-size: 16px !important; }        /* iOS hace zoom solo si un campo tiene menos de 16px */
   .hud { touch-action: manipulation; }
   .hud-left { top: max(10px, env(safe-area-inset-top)); left: 10px; width: calc(100vw - 20px); z-index: 12; max-height: calc(100dvh - 20px); }
-  #filters, #saved { max-height: min(60dvh, calc(100dvh - 160px)); }
-  body.panel-open #filters, body.panel-open #saved { max-height: calc(48dvh - 78px); }
+  #filters, #saved, #people { max-height: min(60dvh, calc(100dvh - 160px)); }
+  body.panel-open #filters, body.panel-open #saved, body.panel-open #people { max-height: calc(48dvh - 126px); }
   body.filters-open #perf, #perf { left: 10px; top: 66px; bottom: auto; }
 
   #panel { top: auto; left: 0; right: 0; bottom: 0; width: 100%; height: 52dvh; border-radius: 20px 20px 0 0; border-bottom: 0;

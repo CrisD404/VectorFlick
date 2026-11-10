@@ -1,4 +1,4 @@
-// Búsqueda por título (internacional u original) sobre todo el catálogo, fuera del hilo principal.
+// Búsqueda por título (internacional, original o en español) sobre todo el catálogo, fuera del hilo principal.
 // Los títulos llegan en trozos ordenados por importancia, así que recorrerlos en orden
 // ya devuelve primero las películas más conocidas y permite cortar la búsqueda temprano.
 
@@ -77,12 +77,14 @@ function run(m) {
       let ok = true;
       for (const t of terms) if (t !== key && !line.includes(t)) { ok = false; break; }
       if (!ok) continue;
-      // cada línea es "título" o "título<TAB>título original": se queda con el campo que mejor coincide
-      const tab = line.indexOf('\t');
+      // cada línea es "título<TAB>título original<TAB>títulos en español…" (los campos extra son
+      // opcionales y el original puede venir vacío): se queda con el campo que mejor coincide
+      const fields = line.split('\t');
       let cls = 5, field = 0, flen = line.length;
-      for (let f = 0; f < (tab < 0 ? 1 : 2); f++) {
-        const s = tab < 0 ? line : f ? line.slice(tab + 1) : line.slice(0, tab), cf = classify(s, nq, terms);
-        if (cf < cls) { cls = cf; field = f; flen = s.length; }
+      for (let f = 0; f < fields.length; f++) {
+        if (!fields[f]) continue;
+        const cf = classify(fields[f], nq, terms);
+        if (cf < cls) { cls = cf; field = f; flen = fields[f].length; }
       }
       const i = c * chunkSize + li;
       out.push({ i, c, li, field, score: (i + 20) * PENALTY[cls] * (1 + flen / 400) });
@@ -96,8 +98,8 @@ function run(m) {
   out.sort((x, y) => x.score - y.score);
   const items = out.slice(0, LIMIT).map(({ i, c, li, field }) => {
     const { text, ts } = chunks[c];
-    const [t, o] = text.slice(ts[li], li + 1 < ts.length ? ts[li + 1] - 1 : text.length).split('\t');
-    return field && o ? { i, t, o } : { i, t };          // "o": título original, cuando la coincidencia vino de ahí
+    const f = text.slice(ts[li], li + 1 < ts.length ? ts[li + 1] - 1 : text.length).split('\t');
+    return field && f[field] ? { i, t: f[0], o: f[field] } : { i, t: f[0] };   // "o": el título alternativo que coincidió
   });
   postMessage({ type: 'r', id: m.id, q: nq, items, loading, progress });
 }
