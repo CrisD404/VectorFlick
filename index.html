@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=overlays-content">
+<title>VectorFlick — el mapa de todas las películas</title>
+<meta name="description" content="Mapa interactivo de casi dos millones de películas, ubicadas por similitud: explorá por género, buscá un título y descubrí qué hay cerca.">
+<meta property="og:title" content="VectorFlick — el mapa de todas las películas">
+<meta property="og:description" content="Mapa interactivo de casi dos millones de películas, ubicadas por similitud.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#07080c">
+<link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307080c'/%3E%3Ccircle cx='11' cy='12' r='4' fill='%23ffb224'/%3E%3Ccircle cx='21' cy='10' r='2.5' fill='%234f8ff7'/%3E%3Ccircle cx='20' cy='21' r='5' fill='%23e8234a'/%3E%3Ccircle cx='9' cy='22' r='2' fill='%231de9b6'/%3E%3C/svg%3E">
+</head>
+<body>
+<canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="overlay" tabindex="0" aria-label="Mapa de películas. Arrastrá para moverte, rueda para hacer zoom."></canvas>
+
+<div id="progress" aria-hidden="true"><i></i></div>
+
+<div class="hud hud-left">
+  <div class="searchbox glass" role="search">
+    <svg class="brand" viewBox="0 0 32 32" aria-hidden="true"><circle cx="11" cy="12" r="4" fill="#ffb224"/><circle cx="21" cy="10" r="2.5" fill="#4f8ff7"/><circle cx="20" cy="21" r="5" fill="#e8234a"/><circle cx="9" cy="22" r="2" fill="#1de9b6"/></svg>
+    <input id="q" type="search" placeholder="Buscar en VectorFlick…" autocomplete="off" spellcheck="false" aria-label="Buscar película" aria-controls="results" aria-expanded="false">
+    <kbd id="q-kbd">/</kbd>
+    <button id="btn-saved" class="icon-btn" title="Películas guardadas (G)" aria-expanded="false" aria-controls="saved">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span id="saved-badge" class="badge" hidden></span>
+    </button>
+    <button id="btn-filters" class="icon-btn" title="Filtros y colores (F)" aria-expanded="true" aria-controls="filters">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span id="filter-badge" class="badge" hidden></span>
+    </button>
+  </div>
+  <ul id="results" class="glass" role="listbox" hidden></ul>
+
+  <section id="filters" class="glass" aria-label="Filtros">
+    <div class="row seg-row">
+      <span class="lbl">Color</span>
+      <div class="seg" id="color-mode" role="radiogroup" aria-label="Colorear por">
+        <button role="radio" data-mode="0" aria-checked="true">Género</button>
+        <button role="radio" data-mode="1" aria-checked="false">Año</button>
+        <button role="radio" data-mode="2" aria-checked="false">Nota</button>
+        <button role="radio" data-mode="3" aria-checked="false">Idioma</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head">
+        <span class="lbl">Géneros</span>
+        <button id="genre-mode" class="link-btn" title="Cambiar entre coincidir con cualquiera o con todos">cualquiera</button>
+      </div>
+      <div id="genres" class="chips"></div>
+    </div>
+
+    <div class="group" id="legend-alt" hidden></div>
+
+    <div class="group">
+      <div class="group-head"><span class="lbl">Año</span><output id="year-out"></output></div>
+      <div class="dual" id="year-dual">
+        <div class="track"><i id="year-fill"></i></div>
+        <input type="range" id="year-min" aria-label="Año mínimo">
+        <input type="range" id="year-max" aria-label="Año máximo">
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><span class="lbl">Nota mínima</span><output id="rating-out">cualquiera</output></div>
+      <input type="range" id="rating-min" class="single" min="0" max="90" step="5" value="0" aria-label="Nota mínima">
+    </div>
+
+    <div class="group two">
+      <label class="field">
+        <span class="lbl">Idioma</span>
+        <select id="lang"><option value="-1">Todos</option></select>
+      </label>
+      <div class="toggles">
+        <label class="tgl"><input type="checkbox" id="only-saved"><span>Solo guardadas</span></label>
+        <label class="tgl"><input type="checkbox" id="only-poster"><span>Solo con póster</span></label>
+        <label class="tgl"><input type="checkbox" id="hide-adult"><span>Ocultar adultos</span></label>
+      </div>
+    </div>
+
+    <div class="count-row">
+      <span id="count"></span>
+      <button id="reset" class="link-btn" hidden>Limpiar filtros</button>
+    </div>
+    <p class="credits-m">VectorFlick · datos de <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> e <a href="https://www.imdb.com/" target="_blank" rel="noopener">IMDb</a> · proyecto independiente, sin afiliación con ellos</p>
+  </section>
+
+  <section id="saved" class="glass" aria-label="Películas guardadas" hidden>
+    <div class="group-head">
+      <span class="lbl">Guardadas <b id="saved-count"></b></span>
+      <label class="tgl"><input type="checkbox" id="saved-only"><span>Ver solo estas en el mapa</span></label>
+    </div>
+    <ul id="saved-list" class="similar"></ul>
+    <div class="saved-foot">
+      <button id="saved-export" class="link-btn">Exportar lista</button>
+      <label class="link-btn" tabindex="0">Importar<input type="file" id="saved-import" accept="application/json,.json" hidden></label>
+    </div>
+  </section>
+</div>
+
+<aside id="panel" class="glass" aria-label="Detalle de la película" hidden>
+  <div id="sheet-grip" role="button" tabindex="-1" aria-label="Expandir o contraer la ficha"><i></i></div>
+  <button id="panel-close" class="icon-btn close" title="Cerrar (Esc)" aria-label="Cerrar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+  <div id="panel-body"></div>
+</aside>
+
+<div id="tooltip" class="glass" hidden></div>
+<div id="perf" class="glass" hidden></div>
+
+<div id="lightbox" role="dialog" aria-label="Póster ampliado" hidden>
+  <img alt="">
+  <button class="icon-btn close" aria-label="Cerrar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<div class="hud hud-br">
+  <div class="zoomctl glass">
+    <button id="z-in" class="icon-btn" title="Acercar (+)" aria-label="Acercar"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button id="z-out" class="icon-btn" title="Alejar (−)" aria-label="Alejar"><svg viewBox="0 0 24 24"><path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button id="z-fit" class="icon-btn" title="Ver todo (0)" aria-label="Ver todo"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button id="z-labels" class="icon-btn on" title="Etiquetas (L)" aria-label="Mostrar u ocultar etiquetas" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M5 7h14M12 7v11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button id="z-random" class="icon-btn" title="Película al azar (R)" aria-label="Película al azar"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="15" cy="15" r="1.4" fill="currentColor"/><circle cx="15" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg></button>
+  </div>
+</div>
+
+<footer class="hud hud-bl">
+  <span id="hint">Rueda para zoom · arrastrá para moverte · click en una película para ver su ficha</span>
+  <span id="credits"><b>VectorFlick</b> · datos de <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> e <a href="https://www.imdb.com/" target="_blank" rel="noopener">IMDb</a> · proyecto independiente, sin afiliación con ellos</span>
+</footer>
+
+<div id="fatal" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
