@@ -12,7 +12,8 @@ Funciona en computadora y en celular. No tiene cuentas, publicidad ni analítica
 
 - **Explorar** el mapa con zoom y arrastre. Los nombres de las regiones aparecen en tres niveles a medida
   que te acercás (género → subgénero → tema).
-- **Buscar** cualquier título del catálogo.
+- **Buscar** cualquier título del catálogo, por su título internacional o por el original
+  (*The Secret in Their Eyes* o *El secreto de sus ojos*).
 - **Filtrar** por género, año, nota mínima e idioma, y **colorear** el mapa por género, año, nota o idioma.
 - **Abrir una ficha**: póster, año, idioma, duración, dirección, nota, géneros, sinopsis, reparto,
   enlaces a TMDB/IMDb y 12 películas similares (también dibujadas como líneas sobre el mapa).

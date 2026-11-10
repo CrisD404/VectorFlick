@@ -1249,7 +1249,7 @@ function showResults(m) {
   results = m.items.filter((r) => r.i < loaded); resIdx = results.length ? 0 : -1;
   const words = m.q.split(' ').filter(Boolean);
   const hl = (t) => {   // resalta las coincidencias (comparando sin acentos)
-    const n = t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const n = t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
     if (n.length !== t.length) return esc(t);
     const marks = new Uint8Array(t.length);
     for (const w of words) { let p = -1; while ((p = n.indexOf(w, p + 1)) >= 0) marks.fill(1, p, p + w.length); }
@@ -1258,7 +1258,7 @@ function showResults(m) {
     return out + (open ? '</mark>' : '');
   };
   resEl.innerHTML = results.length
-    ? results.map((r, k) => `<li role="option" data-k="${k}" aria-selected="${k === 0}"><span class="dot" style="background:${colorOf(r.i)}"></span><span class="t">${hl(r.t)}</span><span class="y">${AT[r.i * 8 + 5] & F_SAVED ? '<span style="color:var(--accent)">★</span> ' : ''}${yearOf(r.i) || ''}</span></li>`).join('')
+    ? results.map((r, k) => `<li role="option" data-k="${k}" aria-selected="${k === 0}"><span class="dot" style="background:${colorOf(r.i)}"></span><span class="t">${hl(r.t)}${r.o ? `<span class="o">${hl(r.o)}</span>` : ''}</span><span class="y">${AT[r.i * 8 + 5] & F_SAVED ? '<span style="color:var(--accent)">★</span> ' : ''}${yearOf(r.i) || ''}</span></li>`).join('')
       + (m.loading ? `<li class="more">Indexando el catálogo… ${Math.round(m.progress * 100)}%</li>` : '')
     : `<li class="empty">${m.loading ? `Buscando… (indexando ${Math.round(m.progress * 100)}%)` : 'Sin resultados para esa búsqueda.'}</li>`;
   resEl.hidden = false; qEl.setAttribute('aria-expanded', 'true');
@@ -1335,7 +1335,8 @@ async function boot() {
   loadSaved();                                       // antes de los puntos: cada trozo marca sus guardadas al llegar
   if (new URLSearchParams(location.search).has('perf')) togglePerf();   // ?perf muestra el medidor (útil en el celular)
   cam.s = 0; resize(); updateCount();
-  fetchText('titles/0.txt').then((t) => { titles0 = t.split('\n'); render(); });
+  // cada línea es "título" o "título<TAB>título original"; para rotular el mapa alcanza el primero
+  fetchText('titles/0.txt').then((t) => { titles0 = t.split('\n').map((l) => { const k = l.indexOf('\t'); return k < 0 ? l : l.slice(0, k); }); render(); });
   let next = 0, done = 0;
   const K = M.chunks.length, pending = new Map();
   const loadOne = async (k) => {

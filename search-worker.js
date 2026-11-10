@@ -1,4 +1,4 @@
-// Búsqueda por título sobre todo el catálogo, fuera del hilo principal.
+// Búsqueda por título (internacional u original) sobre todo el catálogo, fuera del hilo principal.
 // Los títulos llegan en trozos ordenados por importancia, así que recorrerlos en orden
 // ya devuelve primero las películas más conocidas y permite cortar la búsqueda temprano.
 
@@ -6,10 +6,23 @@ let base = '', ver = 0, counts = [], chunkSize = 65536;
 const chunks = [];           // { text, ts, norm, ns }  (ts/ns = inicio de cada línea)
 let lastQ = null;
 
-const norm = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const norm = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();   // sin acentos ni mayúsculas
 const ARTICLES = new Set(['the ', 'a ', 'an ', 'el ', 'la ', 'los ', 'las ', 'le ', 'les ', "l'", 'der ', 'die ', 'das ', 'il ', 'lo ', 'un ', 'una ', 'o ', 'os ', 'as ']);
-const PENALTY = [1, 2.2, 4, 12, 45];   // exacto, prefijo, inicio de palabra, términos sueltos, dentro de palabra
+// exacto, prefijo, inicio de palabra, términos sueltos, dentro de palabra, términos repartidos entre ambos títulos
+const PENALTY = [1, 2.2, 4, 12, 45, 30];
 const LIMIT = 40;
+
+// Qué tan bien coincide la consulta con un título (menor = mejor; 9 = no coincide).
+function classify(s, nq, terms) {
+  const pos = s.indexOf(nq);
+  if (pos === 0) return s.length === nq.length ? 0 : 1;
+  if (pos > 0) {
+    if (ARTICLES.has(s.slice(0, pos))) return s.length === pos + nq.length ? 0 : 1;
+    return /[a-z0-9]/.test(s[pos - 1]) ? 4 : 2;
+  }
+  for (const t of terms) if (!s.includes(t)) return 9;
+  return 3;
+}
 
 function lineStarts(s, n) {
   const a = new Uint32Array(n);
@@ -64,15 +77,15 @@ function run(m) {
       let ok = true;
       for (const t of terms) if (t !== key && !line.includes(t)) { ok = false; break; }
       if (!ok) continue;
-      const pos = line.indexOf(nq);
-      let cls = 3;
-      if (pos === 0) cls = line.length === nq.length ? 0 : 1;
-      else if (pos > 0) {
-        if (ARTICLES.has(line.slice(0, pos))) cls = line.length === pos + nq.length ? 0 : 1;
-        else cls = /[a-z0-9]/.test(line[pos - 1]) ? 4 : 2;
+      // cada línea es "título" o "título<TAB>título original": se queda con el campo que mejor coincide
+      const tab = line.indexOf('\t');
+      let cls = 5, field = 0, flen = line.length;
+      for (let f = 0; f < (tab < 0 ? 1 : 2); f++) {
+        const s = tab < 0 ? line : f ? line.slice(tab + 1) : line.slice(0, tab), cf = classify(s, nq, terms);
+        if (cf < cls) { cls = cf; field = f; flen = s.length; }
       }
       const i = c * chunkSize + li;
-      out.push({ i, c, li, score: (i + 20) * PENALTY[cls] * (1 + line.length / 400) });
+      out.push({ i, c, li, field, score: (i + 20) * PENALTY[cls] * (1 + flen / 400) });
       if (++hits > 30000) break;
     }
     if (out.length >= LIMIT) {
@@ -81,9 +94,10 @@ function run(m) {
     }
   }
   out.sort((x, y) => x.score - y.score);
-  const items = out.slice(0, LIMIT).map(({ i, c, li }) => {
+  const items = out.slice(0, LIMIT).map(({ i, c, li, field }) => {
     const { text, ts } = chunks[c];
-    return { i, t: text.slice(ts[li], li + 1 < ts.length ? ts[li + 1] - 1 : text.length) };
+    const [t, o] = text.slice(ts[li], li + 1 < ts.length ? ts[li + 1] - 1 : text.length).split('\t');
+    return field && o ? { i, t, o } : { i, t };          // "o": título original, cuando la coincidencia vino de ahí
   });
   postMessage({ type: 'r', id: m.id, q: nq, items, loading, progress });
 }

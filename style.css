@@ -112,6 +112,8 @@ kbd { font: 11px/1 var(--font); color: var(--faint); border: 1px solid var(--lin
 #results .dot { width: 9px; height: 9px; border-radius: 50%; }
 #results .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #results .t mark { background: none; color: var(--accent); font-weight: 600; }
+#results .t .o { color: var(--faint); margin-left: 8px; font-size: 12.5px; }       /* título original */
+#results .t .o mark { font-weight: 500; }
 #results .y { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; }
 #results .empty, #results .more { grid-template-columns: 1fr; color: var(--faint); cursor: default; font-size: 12.5px; }
 #results .empty:hover, #results .more:hover { background: none; }
